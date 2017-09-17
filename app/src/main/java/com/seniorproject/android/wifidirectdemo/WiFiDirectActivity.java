@@ -1,11 +1,16 @@
 package com.seniorproject.android.wifidirectdemo;
 
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pManager;
@@ -14,6 +19,7 @@ import android.net.wifi.p2p.WifiP2pManager.Channel;
 import android.net.wifi.p2p.WifiP2pManager.ChannelListener;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -37,12 +43,14 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
     private final IntentFilter intentFilter = new IntentFilter();
     private Channel channel;
     private BroadcastReceiver receiver = null;
+
     /**
      * @param isWifiP2pEnabled the isWifiP2pEnabled to set
      */
     public void setIsWifiP2pEnabled(boolean isWifiP2pEnabled) {
         this.isWifiP2pEnabled = isWifiP2pEnabled;
     }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,19 +62,34 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
         manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
         channel = manager.initialize(this, getMainLooper(), null);
+
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+
+        if (locationManager != null) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Working...");
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
+            }
+        }
     }
-    /** register the BroadcastReceiver with the intent values to be matched */
+
+    /**
+     * register the BroadcastReceiver with the intent values to be matched
+     */
     @Override
     public void onResume() {
         super.onResume();
         receiver = new WiFiDirectBroadcastReceiver(manager, channel, this);
         registerReceiver(receiver, intentFilter);
     }
+
     @Override
     public void onPause() {
         super.onPause();
         unregisterReceiver(receiver);
     }
+
     /**
      * Remove all peers and clear all fields. This is called on
      * BroadcastReceiver receiving a state change event.
@@ -83,12 +106,14 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             fragmentDetails.resetViews();
         }
     }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.action_items, menu);
         return true;
     }
+
     /*
      * (non-Javadoc)
      * @see android.app.Activity#onOptionsItemSelected(android.view.MenuItem)
@@ -121,6 +146,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                         Toast.makeText(WiFiDirectActivity.this, "Discovery Initiated",
                                 Toast.LENGTH_SHORT).show();
                     }
+
                     @Override
                     public void onFailure(int reasonCode) {
                         Toast.makeText(WiFiDirectActivity.this, "Discovery Failed : " + reasonCode,
@@ -132,12 +158,14 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                 return super.onOptionsItemSelected(item);
         }
     }
+
     @Override
     public void showDetails(WifiP2pDevice device) {
         DeviceDetailFragment fragment = (DeviceDetailFragment) getFragmentManager()
                 .findFragmentById(R.id.frag_detail);
         fragment.showDetails(device);
     }
+
     @Override
     public void connect(WifiP2pConfig config) {
         manager.connect(channel, config, new ActionListener() {
@@ -145,6 +173,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             public void onSuccess() {
                 // WiFiDirectBroadcastReceiver will notify us. Ignore for now.
             }
+
             @Override
             public void onFailure(int reason) {
                 Toast.makeText(WiFiDirectActivity.this, "Connect failed. Retry.",
@@ -152,6 +181,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             }
         });
     }
+
     @Override
     public void disconnect() {
         final DeviceDetailFragment fragment = (DeviceDetailFragment) getFragmentManager()
@@ -162,12 +192,14 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             public void onFailure(int reasonCode) {
                 Log.d(TAG, "Disconnect failed. Reason :" + reasonCode);
             }
+
             @Override
             public void onSuccess() {
                 fragment.getView().setVisibility(View.GONE);
             }
         });
     }
+
     @Override
     public void onChannelDisconnected() {
         // we will try once more
@@ -182,6 +214,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                     Toast.LENGTH_LONG).show();
         }
     }
+
     @Override
     public void cancelDisconnect() {
         /*
@@ -203,6 +236,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
                         Toast.makeText(WiFiDirectActivity.this, "Aborting connection",
                                 Toast.LENGTH_SHORT).show();
                     }
+
                     @Override
                     public void onFailure(int reasonCode) {
                         Toast.makeText(WiFiDirectActivity.this,
@@ -213,4 +247,35 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             }
         }
     }
+
+    private final LocationListener locationListener = new LocationListener() {
+        @Override
+        public void onLocationChanged(Location location) {
+            // TODO Auto-generated method stub
+
+            double latitude = location.getLatitude();
+            double longitude = location.getLongitude();
+
+            Log.d("Geo_Location", "Latitude: " + latitude + ", Longitude: " + longitude);
+        }
+
+        @Override
+        public void onProviderDisabled(String provider) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onProviderEnabled(String provider) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {
+            // TODO Auto-generated method stub
+
+        }
+    };
+
 }
